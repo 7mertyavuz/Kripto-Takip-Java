@@ -67,14 +67,11 @@ public class odev_2516501021 {
             // Ustune yazsin diye false yapiyorum, yoksa ayni veriler alt alta cogaliyor
             FileWriter fw = new FileWriter(dosyaAdi, false);
             
-            // Java 8 SSL hatasi vermesin diye
-            System.setProperty("https.protocols", "TLSv1.2");
-            URL url = new URL("https://api.coincap.io/v2/assets");
+            // Java'yi engellemeyen CoinLore API kullaniyoruz
+            URL url = new URL("https://api.coinlore.net/api/tickers/");
             HttpURLConnection baglanti = (HttpURLConnection) url.openConnection();
             baglanti.setRequestMethod("GET");
-
-            // API bizi bot sanip 403 Forbidden vermesin diye tarayici taklidi yapiyoruz
-            baglanti.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
+            baglanti.setRequestProperty("User-Agent", "Mozilla/5.0");
 
             BufferedReader br = new BufferedReader(new InputStreamReader(baglanti.getInputStream()));
             String satir;
@@ -96,11 +93,13 @@ public class odev_2516501021 {
                 if (kaydedilenAdet >= 35) break; // Hocanin istedigi min 30 sarti
                 
                 String tekCoin = coinler[i];
+                
+                // CoinLore API'sinin verilerine gore kelimeler
                 String sira = parcaBul(tekCoin, "rank");
                 String sembol = parcaBul(tekCoin, "symbol");
                 String isim = parcaBul(tekCoin, "name");
-                String fiyat = parcaBul(tekCoin, "priceUsd");
-                String degisim = parcaBul(tekCoin, "changePercent24Hr");
+                String fiyat = parcaBul(tekCoin, "price_usd");
+                String degisim = parcaBul(tekCoin, "percent_change_24h");
 
                 // Virgullerden sonrasi cok uzun olmasin diye kirpiyorum
                 if (fiyat.length() > 10) fiyat = fiyat.substring(0, 10);
@@ -116,21 +115,31 @@ public class odev_2516501021 {
             logYaz("API uzerinden " + kaydedilenAdet + " adet veri guncellendi.");
 
         } catch (Exception e) {
-            System.out.println("API Baglanti Hatasi. Gecici olarak internetinizi degistirip (ornegin telefonun internetiyle) deneyin.");
+            System.out.println("API Baglanti Hatasi! Internet baglantinizi kontrol edin.");
             logYaz("HATA: API'den veri cekilemedi.");
         }
     }
 
-    // Yardimci metot: indexOf ve substring kullanarak istenen veriyi cekiyor
+    // Gelismis parca bulucu: Hem tirnakli hem tirnaksiz verileri sorunsuz ceker
     public static String parcaBul(String metin, String arananKelime) {
         try {
-            String aranan = "\"" + arananKelime + "\":\"";
+            String aranan = "\"" + arananKelime + "\":";
             int baslangic = metin.indexOf(aranan);
             if (baslangic == -1) return "0";
             
             baslangic += aranan.length();
-            int bitis = metin.indexOf("\"", baslangic);
-            return metin.substring(baslangic, bitis);
+            
+            // Eger veri String (tirnak icinde) ise
+            if (metin.charAt(baslangic) == '\"') {
+                baslangic++; // Ilk tirnagi atla
+                int bitis = metin.indexOf("\"", baslangic);
+                return metin.substring(baslangic, bitis);
+            } else {
+                // Eger veri sayi (tirnaksiz) ise
+                int bitis = metin.indexOf(",", baslangic);
+                if (bitis == -1) bitis = metin.indexOf("}", baslangic);
+                return metin.substring(baslangic, bitis).trim();
+            }
         } catch (Exception e) {
             return "0";
         }
@@ -236,7 +245,7 @@ public class odev_2516501021 {
         System.out.print("Fiyatini degistirmek istediginiz coinin sembolunu girin (Orn: BTC): ");
         String arananSembol = oku.nextLine().toUpperCase();
         
-        String[] geciciHafiza = new String[500]; // Dosyayi tutmak icin dizi
+        String[] geciciHafiza = new String[500];
         int satirSayaci = 0;
         boolean degisimOlduMu = false;
 
@@ -254,7 +263,6 @@ public class odev_2516501021 {
                     if (oku.nextLine().equalsIgnoreCase("e")) {
                         System.out.print("Lutfen yeni fiyati yazin: ");
                         String yeniDeger = oku.nextLine();
-                        // Satiri yeni fiyatla tekrar olusturuyoruz
                         okunanSatir = ayrilmis[0] + ";" + ayrilmis[1] + ";" + ayrilmis[2] + ";" + yeniDeger + ";" + ayrilmis[4];
                         degisimOlduMu = true;
                         System.out.println("Basarili! Yeni fiyat dosyaya islendi.");
@@ -265,7 +273,6 @@ public class odev_2516501021 {
             }
             br.close();
 
-            // Eger bir degisiklik yapildiysa diziyi tekrar txt dosyasina ustune yazarak kaydediyoruz
             if (degisimOlduMu) {
                 FileWriter fw = new FileWriter(dosyaAdi, false);
                 for (int i = 0; i < satirSayaci; i++) {
@@ -303,7 +310,7 @@ public class odev_2516501021 {
                         silindiMi = true;
                         System.out.println("Coin dosyadan kalici olarak silindi.");
                         logYaz(arananSembol + " sembolu txt dosyasindan silindi.");
-                        continue; // Ekledigim bu continue sayesinde silinen veriyi diziye aktarmiyor
+                        continue; 
                     }
                 }
                 geciciHafiza[satirSayaci++] = okunanSatir;
@@ -324,7 +331,6 @@ public class odev_2516501021 {
         }
     }
 
-    // YARIM KALAN İSTATİSTİK METODU TAMAMLANDI
     public static void istatistikler() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(dosyaAdi));
@@ -357,13 +363,13 @@ public class odev_2516501021 {
             br.close();
 
             if (toplamAdet > 0) {
-                System.out.println("\n--- PİYASA İSTATİSTİKLERİ ---");
-                System.out.println("En Pahalı Coin    : " + enPahali + " ($" + maksFiyat + ")");
-                System.out.println("En Çok Yükselen   : " + enCokYukselen + " (%" + maksDegisim + ")");
+                System.out.println("\n--- PIYASA ISTATISTIKLERI ---");
+                System.out.println("En Pahali Coin    : " + enPahali + " ($" + maksFiyat + ")");
+                System.out.println("En Cok Yukselen   : " + enCokYukselen + " (%" + maksDegisim + ")");
                 System.out.println("Ortalama Fiyat    : $" + (toplamHacim / toplamAdet));
                 logYaz("Piyasa istatistikleri goruntulendi.");
             } else {
-                System.out.println("Dosyada veri bulunamadı. Lütfen önce API'den veri çekin.");
+                System.out.println("Dosyada veri bulunamadi. Lutfen once API'den veri cekin.");
             }
 
         } catch (Exception e) {
@@ -371,10 +377,9 @@ public class odev_2516501021 {
         }
     }
 
-    // EKSİK OLAN LOG YAZMA METODU EKLENDİ
     public static void logYaz(String mesaj) {
         try {
-            FileWriter fw = new FileWriter(logDosyasi, true); // true parametresi veriyi silmeden altina ekler
+            FileWriter fw = new FileWriter(logDosyasi, true); 
             String zaman = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
             fw.write("[" + zaman + "] " + mesaj + "\n");
             fw.close();
@@ -383,12 +388,11 @@ public class odev_2516501021 {
         }
     }
 
-    // EKSİK OLAN LOG GÖSTERME METODU EKLENDİ
     public static void loglariGoster() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(logDosyasi));
             String satir;
-            System.out.println("\n--- SİSTEM LOGLARI ---");
+            System.out.println("\n--- SISTEM LOGLARI ---");
             while ((satir = br.readLine()) != null) {
                 System.out.println(satir);
             }
@@ -399,11 +403,10 @@ public class odev_2516501021 {
         }
     }
 
-    // EKSİK OLAN DOSYA TEMİZLEME METODU EKLENDİ
     public static void dosyayiTemizle() {
         try {
             FileWriter fw = new FileWriter(dosyaAdi, false);
-            fw.write(""); // Icerigini bosaltir
+            fw.write(""); 
             fw.close();
             System.out.println("Veritabani (Txt dosyasi) basariyla temizlendi.");
             logYaz("Veritabani manuel olarak temizlendi.");
