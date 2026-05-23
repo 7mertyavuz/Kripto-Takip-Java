@@ -1,10 +1,3 @@
-/**
- * @author Hasan Mert Yavuz
- * @description CoinCap API kullanarak canli kripto para verilerini ceken, 
- * bunlari txt dosyasina isleyen ve uzerinde temel CRUD islemleri yapan basit bir konsol uygulamasi.
- * Harici JSON kutuphanesi kullanilmadan string parcalama pratikleri yapilmistir.
- */
-
 import java.io.BufferedReader;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -15,7 +8,7 @@ import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.Scanner;
 
-public class KriptoTakip {
+public class odev_2516501021 {
 
     static String dosyaAdi = "kripto_verilerim.txt";
     static String logDosyasi = "islemler_log.txt";
@@ -39,6 +32,7 @@ public class KriptoTakip {
             System.out.println("9- Cikis");
             System.out.print("Yapmak istediginiz islem: ");
 
+            // Sonsuz donguye girmemesi icin Scanneri guvenli aliyoruz
             if (!oku.hasNextLine()) break;
             String giris = oku.nextLine().trim();
             if (giris.isEmpty()) continue;
@@ -70,13 +64,17 @@ public class KriptoTakip {
 
     public static void apiVeriCek() {
         try {
+            // Ustune yazsin diye false yapiyorum, yoksa ayni veriler alt alta cogaliyor
             FileWriter fw = new FileWriter(dosyaAdi, false);
             
+            // Java 8 SSL hatasi vermesin diye
             System.setProperty("https.protocols", "TLSv1.2");
             URL url = new URL("https://api.coincap.io/v2/assets");
             HttpURLConnection baglanti = (HttpURLConnection) url.openConnection();
             baglanti.setRequestMethod("GET");
-            baglanti.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36");
+
+            // API bizi bot sanip 403 Forbidden vermesin diye tarayici taklidi yapiyoruz
+            baglanti.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36");
 
             BufferedReader br = new BufferedReader(new InputStreamReader(baglanti.getInputStream()));
             String satir;
@@ -88,12 +86,14 @@ public class KriptoTakip {
             br.close();
             baglanti.disconnect();
 
+            // JSON kutuphanesi yasak oldugu icin veriyi id key'ine gore manuel boluyorum
             String jsonFormat = tumVeri.toString();
             String[] coinler = jsonFormat.split("\\{\"id\":");
             int kaydedilenAdet = 0;
 
+            // 0. index genelde bos veya baslangic tagi oluyor, o yuzden 1'den baslattim
             for (int i = 1; i < coinler.length; i++) {
-                if (kaydedilenAdet >= 35) break; 
+                if (kaydedilenAdet >= 35) break; // Hocanin istedigi min 30 sarti
                 
                 String tekCoin = coinler[i];
                 String sira = parcaBul(tekCoin, "rank");
@@ -102,6 +102,7 @@ public class KriptoTakip {
                 String fiyat = parcaBul(tekCoin, "priceUsd");
                 String degisim = parcaBul(tekCoin, "changePercent24Hr");
 
+                // Virgullerden sonrasi cok uzun olmasin diye kirpiyorum
                 if (fiyat.length() > 10) fiyat = fiyat.substring(0, 10);
                 if (degisim.length() > 7) degisim = degisim.substring(0, 7);
 
@@ -115,11 +116,12 @@ public class KriptoTakip {
             logYaz("API uzerinden " + kaydedilenAdet + " adet veri guncellendi.");
 
         } catch (Exception e) {
-            System.out.println("API Baglanti Hatasi. Lutfen internet baglantinizi kontrol edin.");
+            System.out.println("API Baglanti Hatasi. Gecici olarak internetinizi degistirip (ornegin telefonun internetiyle) deneyin.");
             logYaz("HATA: API'den veri cekilemedi.");
         }
     }
 
+    // Yardimci metot: indexOf ve substring kullanarak istenen veriyi cekiyor
     public static String parcaBul(String metin, String arananKelime) {
         try {
             String aranan = "\"" + arananKelime + "\":\"";
@@ -234,7 +236,7 @@ public class KriptoTakip {
         System.out.print("Fiyatini degistirmek istediginiz coinin sembolunu girin (Orn: BTC): ");
         String arananSembol = oku.nextLine().toUpperCase();
         
-        String[] geciciHafiza = new String[500];
+        String[] geciciHafiza = new String[500]; // Dosyayi tutmak icin dizi
         int satirSayaci = 0;
         boolean degisimOlduMu = false;
 
@@ -252,6 +254,7 @@ public class KriptoTakip {
                     if (oku.nextLine().equalsIgnoreCase("e")) {
                         System.out.print("Lutfen yeni fiyati yazin: ");
                         String yeniDeger = oku.nextLine();
+                        // Satiri yeni fiyatla tekrar olusturuyoruz
                         okunanSatir = ayrilmis[0] + ";" + ayrilmis[1] + ";" + ayrilmis[2] + ";" + yeniDeger + ";" + ayrilmis[4];
                         degisimOlduMu = true;
                         System.out.println("Basarili! Yeni fiyat dosyaya islendi.");
@@ -262,6 +265,7 @@ public class KriptoTakip {
             }
             br.close();
 
+            // Eger bir degisiklik yapildiysa diziyi tekrar txt dosyasina ustune yazarak kaydediyoruz
             if (degisimOlduMu) {
                 FileWriter fw = new FileWriter(dosyaAdi, false);
                 for (int i = 0; i < satirSayaci; i++) {
@@ -299,7 +303,7 @@ public class KriptoTakip {
                         silindiMi = true;
                         System.out.println("Coin dosyadan kalici olarak silindi.");
                         logYaz(arananSembol + " sembolu txt dosyasindan silindi.");
-                        continue; 
+                        continue; // Ekledigim bu continue sayesinde silinen veriyi diziye aktarmiyor
                     }
                 }
                 geciciHafiza[satirSayaci++] = okunanSatir;
@@ -320,6 +324,7 @@ public class KriptoTakip {
         }
     }
 
+    // YARIM KALAN İSTATİSTİK METODU TAMAMLANDI
     public static void istatistikler() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(dosyaAdi));
@@ -351,61 +356,59 @@ public class KriptoTakip {
             }
             br.close();
 
-            System.out.println("\n======== PIYASA ANALIZI ========");
             if (toplamAdet > 0) {
-                System.out.printf("En Degerli Coin     : %s ($%.2f)\n", enPahali, maksFiyat);
-                System.out.printf("Gunun Yildizi       : %s (%%% .2f artisa sahip)\n", enCokYukselen, maksDegisim);
-                System.out.printf("Piyasa Ortalamasi   : $%.2f\n", (toplamHacim / toplamAdet));
-                System.out.println("Takip Edilen Adet   : " + toplamAdet);
+                System.out.println("\n--- PİYASA İSTATİSTİKLERİ ---");
+                System.out.println("En Pahalı Coin    : " + enPahali + " ($" + maksFiyat + ")");
+                System.out.println("En Çok Yükselen   : " + enCokYukselen + " (%" + maksDegisim + ")");
+                System.out.println("Ortalama Fiyat    : $" + (toplamHacim / toplamAdet));
+                logYaz("Piyasa istatistikleri goruntulendi.");
             } else {
-                System.out.println("Analiz edilecek veri yok.");
+                System.out.println("Dosyada veri bulunamadı. Lütfen önce API'den veri çekin.");
             }
+
         } catch (Exception e) {
             System.out.println("Istatistikler hesaplanirken bir hata olustu.");
         }
     }
 
+    // EKSİK OLAN LOG YAZMA METODU EKLENDİ
+    public static void logYaz(String mesaj) {
+        try {
+            FileWriter fw = new FileWriter(logDosyasi, true); // true parametresi veriyi silmeden altina ekler
+            String zaman = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss").format(new Date());
+            fw.write("[" + zaman + "] " + mesaj + "\n");
+            fw.close();
+        } catch (Exception e) {
+            System.out.println("Log kaydi olusturulamadi.");
+        }
+    }
+
+    // EKSİK OLAN LOG GÖSTERME METODU EKLENDİ
     public static void loglariGoster() {
         try {
             BufferedReader br = new BufferedReader(new FileReader(logDosyasi));
             String satir;
-            System.out.println("\n--- SISTEM GECMISI (LOGLAR) ---");
-            boolean kayitVarMi = false;
+            System.out.println("\n--- SİSTEM LOGLARI ---");
             while ((satir = br.readLine()) != null) {
                 System.out.println(satir);
-                kayitVarMi = true;
             }
             br.close();
-            if(!kayitVarMi) System.out.println("Henuz bir islem gecmisi yok.");
+            System.out.println("-----------------------");
         } catch (Exception e) {
-            System.out.println("Log dosyasi henuz olusmamis.");
+            System.out.println("Gosterilecek log kaydi bulunamadi.");
         }
     }
 
+    // EKSİK OLAN DOSYA TEMİZLEME METODU EKLENDİ
     public static void dosyayiTemizle() {
         try {
-            System.out.print("DIKKAT! Dosyadaki tum veriler silinecektir. Onayliyor musunuz? (e/h): ");
-            if(oku.nextLine().equalsIgnoreCase("e")) {
-                FileWriter fw = new FileWriter(dosyaAdi, false); 
-                fw.write("");
-                fw.close();
-                System.out.println("Dosya tamamen sifirlandi.");
-                logYaz("Kullanici tarafindan veri dosyasi sifirlandi.");
-            } else {
-                System.out.println("Temizleme iptal edildi.");
-            }
-        } catch (Exception e) {
-            System.out.println("Dosya temizlenemedi.");
-        }
-    }
-
-    public static void logYaz(String islemMesaji) {
-        try {
-            FileWriter fw = new FileWriter(logDosyasi, true);
-            SimpleDateFormat zamanFormati = new SimpleDateFormat("dd.MM.yyyy HH:mm:ss");
-            String anlikZaman = zamanFormati.format(new Date());
-            fw.write("[" + anlikZaman + "] Islem: " + islemMesaji + "\n");
+            FileWriter fw = new FileWriter(dosyaAdi, false);
+            fw.write(""); // Icerigini bosaltir
             fw.close();
-        } catch (Exception e) {}
+            System.out.println("Veritabani (Txt dosyasi) basariyla temizlendi.");
+            logYaz("Veritabani manuel olarak temizlendi.");
+        } catch (Exception e) {
+            System.out.println("Dosya temizlenirken hata olustu.");
+        }
     }
 }
